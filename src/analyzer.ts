@@ -168,7 +168,7 @@ async function analyzeChunk(
       ],
       response_format: MAP_RESPONSE_FORMAT,
       temperature: 0.1,
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
     });
 
     const raw = response.choices[0]?.message?.content || "{}";
@@ -241,7 +241,7 @@ async function reduceResults(
       ],
       response_format: REDUCE_RESPONSE_FORMAT,
       temperature: 0.2,
-      max_tokens: 3000,
+      max_completion_tokens: 3000,
     });
 
     const raw = response.choices[0]?.message?.content || "{}";
