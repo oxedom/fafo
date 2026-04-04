@@ -1,6 +1,12 @@
 import dotenv from "dotenv";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join, dirname } from "node:path";
 
 dotenv.config();
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const prompts = JSON.parse(readFileSync(join(__dirname, "prompts.json"), "utf-8"));
 
 export function getApiKey(required = true): string {
   const key = process.env.OPENAI_API_KEY || process.env.LLM_API_KEY;
@@ -13,17 +19,9 @@ export function getApiKey(required = true): string {
 }
 
 export const DEFAULT_MODEL = "gpt-4.1";
-export const DEFAULT_PROMPT =
-  "Perform a greybox recon analysis of this web application. Identify the tech stack, map all API endpoints and routes, document auth mechanisms, and flag any security-relevant findings.";
+export const DEFAULT_PROMPT: string = prompts.default;
+export const PROMPT_PRESETS: Record<string, string> = prompts.presets;
 
-export const PROMPT_PRESETS: Record<string, string> = {
-  endpoints:
-    "Map every API endpoint, webhook, and external service URL in this application. For each endpoint, identify: the HTTP method, the path (including dynamic segments like :id or ${var}), any query parameters, and the request/response context (what feature or action triggers it). Group endpoints by service or domain. Flag any undocumented or internal-only paths.",
-  i18n:
-    "Extract every translation key, i18n string, localization identifier, and user-facing text literal in this application. Group them by feature area or namespace (e.g. auth.login.title, errors.network). Identify the i18n library/framework being used, what locales are referenced, and any hardcoded user-facing strings that bypass the i18n system.",
-  stack:
-    "Identify the complete technology stack: frameworks, UI libraries, state management, routing, build tools, CSS approach, and third-party services. Determine the bundler and module format. Map the application architecture — is it SSR, SPA, or hybrid? What data fetching patterns are used (REST, GraphQL, tRPC)? List every third-party SDK or service integration (auth providers, analytics, payments, error tracking).",
-};
 export const DEFAULT_CONCURRENCY = 5;
 export const DEFAULT_MAX_BUNDLE_SIZE_KB = 512;
 export const DEFAULT_MAX_BUNDLES = 5;
