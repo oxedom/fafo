@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Test App</title>
+  <script src="https://www.google-analytics.com/analytics.js" async></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script>console.log("inline script, no src")</script>
+  <script type="module" src="/static/js/main.abc123.js"></script>
+  <script src="/static/js/vendor.def456.js"></script>
+  <script src="/static/js/chunk-abc.js" async></script>
+  <script defer src="/assets/app.bundle.js"></script>
+</body>
+</html>

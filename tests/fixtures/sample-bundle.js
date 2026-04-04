@@ -1,0 +1,1 @@
+!function(){"use strict";var e=require("react"),t=require("react-dom/client");const n=e.createElement;function r(){return n("div",{className:"app"},n("h1",null,"Hello World"),n("p",null,"This is a task management application built with React 18.2.0"))}const o=document.getElementById("root");t.createRoot(o).render(n(r,null))}();
