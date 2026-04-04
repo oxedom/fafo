@@ -1,10 +1,19 @@
 import OpenAI from "openai";
 import pLimit from "p-limit";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { join, dirname } from "node:path";
 import type { AnalysisResult } from "./types.js";
 import type { CodeChunk } from "./chunker.js";
 import type { DistilledBundle } from "./distiller.js";
 import { formatDistilledForLLM } from "./distiller.js";
 import { logVerbose } from "./utils/logger.js";
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const prompts = JSON.parse(readFileSync(join(__dirname, "prompts.json"), "utf-8"));
+
+const MAP_SYSTEM_PROMPT: string = prompts.system.map;
+const REDUCE_SYSTEM_PROMPT: string = prompts.system.reduce;
 
 interface ChunkAnalysis {
   stack: string[];
@@ -15,43 +24,6 @@ interface ChunkAnalysis {
   appFunctionality: string[];
   interestingStrings: string[];
 }
-
-const MAP_SYSTEM_PROMPT = `You are a security-focused frontend analyst performing greybox reconnaissance on a web application's JavaScript bundle.
-
-You will receive one chunk of a beautified JavaScript bundle. Analyze it and respond with a JSON object containing ONLY what you observe in THIS chunk:
-
-- "stack": technologies/frameworks detected with versions if visible (e.g. "React 18.2.0", "Next.js")
-- "endpoints": API endpoints found, include HTTP method if detectable (e.g. "POST /api/auth/login"). Look for fetch(), axios, XMLHttpRequest calls and extract the URL argument even if constructed from variables.
-- "routes": client-side routes/pages. ONLY report paths that appear in route definitions (e.g. createFileRoute('/settings'), createRoute({path: '/dashboard'}), <Route path="/login">). Do NOT report component names (Sidebar, TraineePlayMenu, AddUserDialog) as routes. Do NOT report framework catch-all patterns (/catch/*, /files/*) unless they clearly render user-facing pages.
-- "authMechanisms": authentication/authorization mechanisms (e.g. "JWT in localStorage", "OAuth2"). Note: Cloudflare beacon (window.__cfBeacon, data-cf-beacon) is analytics, NOT authentication — do not report it as auth.
-- "securityFindings": security observations in APPLICATION code only. Do NOT report framework internals (React's dangerouslySetInnerHTML property name, __REACT_DEVTOOLS_GLOBAL_HOOK__, __SECRET_INTERNALS) as security findings — these are normal React framework code.
-- "appFunctionality": high-level features/capabilities (e.g. "file upload", "payment processing")
-- "interestingStrings": notable strings — error messages, config keys, feature flags, env var names, test data (emails, phone numbers)
-
-For each finding, include a brief evidence note in parentheses citing the actual code pattern you observed.
-
-Be specific — cite actual paths, variable names, or patterns. Skip empty arrays. If a chunk is mostly vendor/framework boilerplate, report "chunkType": "vendor" and only report what you can confidently identify.
-
-Respond ONLY with valid JSON. No markdown, no code fences.`;
-
-const REDUCE_SYSTEM_PROMPT = `You are a security-focused frontend analyst. You will receive merged findings from analyzing a web application's JavaScript bundles.
-
-You may also receive pre-extracted structured data (libraries, endpoints, routes, auth patterns) that was deterministically extracted from the code using regex — treat this as ground truth that is more reliable than LLM-inferred findings.
-
-Synthesize everything into a final comprehensive analysis. When pre-extracted data conflicts with LLM-inferred findings, prefer the pre-extracted data. Deduplicate, resolve conflicts, and produce a JSON object:
-
-- "stack": array of frontend technologies/frameworks detected (e.g. "React 18.2.0", "Next.js", "Tailwind CSS")
-- "versions": object mapping technology names to detected version strings
-- "description": 2-4 sentence description of what this application does and its purpose
-- "endpoints": array of API endpoints found, including HTTP method if detectable
-- "routes": array of client-side routes/pages the app exposes. Only include actual navigable routes, not component names.
-- "authMechanisms": array describing authentication/authorization mechanisms
-- "securityFindings": array of potential security observations. Only include findings from application code, not framework internals.
-- "appFunctionality": array of high-level app features/capabilities identified
-
-Focus on what would be useful for a security audit. Be specific — cite actual endpoint paths, variable names, or patterns. Deduplicate similar entries. Merge partial findings into complete ones.
-
-Respond ONLY with valid JSON. No markdown, no code fences.`;
 
 const MAP_RESPONSE_FORMAT = {
   type: "json_schema" as const,
@@ -211,7 +183,6 @@ async function reduceResults(
   distilledBundles?: DistilledBundle[],
   extraContext?: string
 ): Promise<AnalysisResult> {
-  // Build user message with distilled data as ground truth
   let userMessage = prompt;
 
   if (extraContext) {
@@ -264,7 +235,6 @@ async function reduceResults(
 }
 
 function dedupe(arr: string[]): string[] {
-  // Case-insensitive dedup, keeping first occurrence
   const seen = new Set<string>();
   return arr.filter((item) => {
     const key = item.toLowerCase().trim();
