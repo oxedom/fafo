@@ -73,6 +73,12 @@ const MAP_CONCURRENCY = 5;
 // If distilled data is under this size, skip MAP phase and use distilled-only mode
 const DISTILLED_ONLY_THRESHOLD = 60_000;
 
+// Reasoning models (gpt-5.x, o1, o3, o4) reject custom temperature and consume
+// part of max_completion_tokens for internal reasoning before producing output.
+function isReasoningModel(model: string): boolean {
+  return /^(gpt-5|o[1-9])/i.test(model);
+}
+
 export async function analyzeChunked(
   chunks: CodeChunk[],
   model: string,
@@ -132,6 +138,7 @@ async function analyzeChunk(
   logVerbose(`    Analyzing chunk ${chunk.index + 1}/${chunk.totalChunks} of ${chunk.bundleUrl} (${chunk.charCount} chars)`);
 
   try {
+    const reasoning = isReasoningModel(model);
     const response = await client.chat.completions.create({
       model,
       messages: [
@@ -139,8 +146,8 @@ async function analyzeChunk(
         { role: "user", content: userMessage },
       ],
       response_format: MAP_RESPONSE_FORMAT,
-      temperature: 0.1,
-      max_completion_tokens: 1500,
+      ...(reasoning ? {} : { temperature: 0.1 }),
+      max_completion_tokens: reasoning ? 6000 : 1500,
     });
 
     const raw = response.choices[0]?.message?.content || "{}";
@@ -204,6 +211,7 @@ async function reduceResults(
   logVerbose(`  Reduce: sending ${userMessage.length} chars to ${model}`);
 
   try {
+    const reasoning = isReasoningModel(model);
     const response = await client.chat.completions.create({
       model,
       messages: [
@@ -211,8 +219,8 @@ async function reduceResults(
         { role: "user", content: userMessage },
       ],
       response_format: REDUCE_RESPONSE_FORMAT,
-      temperature: 0.2,
-      max_completion_tokens: 3000,
+      ...(reasoning ? {} : { temperature: 0.2 }),
+      max_completion_tokens: reasoning ? 12000 : 3000,
     });
 
     const raw = response.choices[0]?.message?.content || "{}";
