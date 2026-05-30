@@ -17,7 +17,7 @@ npx @oxedom/fafo --input domains.json --mode security
 
 ```bash
 npm install -g @oxedom/fafo   # installs the `fafo` command
-echo '["github.com", "vercel.com"]' > input.json
+echo '["app.example.com", "app-staging.example.com"]' > input.json
 OPENAI_API_KEY=sk-... fafo --input input.json --mode security
 ```
 
