@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import pLimit from "p-limit";
-import type { RunConfig, DomainResult, RunOutput } from "./types.js";
+import type { RunConfig, DomainResult, RunOutput, Mode } from "./types.js";
 import { getApiKey, resolveMode } from "./config.js";
 import { fetchDomainHtml } from "./fetcher.js";
 import { extractScripts, extractTitle, extractHtmlMetadata, formatHtmlMetadataForLLM } from "./parser.js";
@@ -51,7 +51,7 @@ export async function runPipeline(opts: RunConfig): Promise<RunOutput> {
 
   const results: DomainResult[] = await Promise.all(
     validDomains.map((domain: string, i: number) =>
-      limit(() => processDomain(domain, i + 1, validDomains.length, opts, apiKey))
+      limit(() => processDomain(domain, i + 1, validDomains.length, opts, apiKey, mode))
     )
   );
 
@@ -82,11 +82,11 @@ async function processDomain(
   index: number,
   total: number,
   opts: RunConfig,
-  apiKey: string
+  apiKey: string,
+  mode: Mode
 ): Promise<DomainResult> {
   const start = Date.now();
   log(`[${index}/${total}] ${domain}`);
-  const mode = resolveMode(opts.mode);
 
   try {
     // 1. Fetch HTML
@@ -189,7 +189,7 @@ async function processDomain(
       extraContext
     );
 
-    const stackField = (analysis as Record<string, unknown>).stack;
+    const stackField = analysis.stack;
     const summary = Array.isArray(stackField) ? stackField.join(", ") : "";
     log(`  ✓ ${domain}${summary ? ` — ${summary}` : ""}`);
 

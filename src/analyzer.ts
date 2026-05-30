@@ -5,7 +5,7 @@ import type { CodeChunk } from "./chunker.js";
 import type { DistilledBundle } from "./distiller.js";
 import { formatDistilledForLLM } from "./distiller.js";
 import { logVerbose } from "./utils/logger.js";
-import { DISTILLED_ONLY_THRESHOLD, MAP_CONCURRENCY } from "./config.js";
+import { DISTILLED_ONLY_THRESHOLD, MAP_CONCURRENCY, INTERESTING_STRINGS_CAP } from "./config.js";
 
 // Reasoning models (gpt-5.x, o1, o3, o4) reject custom temperature and consume
 // part of max_completion_tokens for internal reasoning before producing output.
@@ -112,7 +112,7 @@ function mergeChunkResults(results: Record<string, string[]>[], mode: Mode): str
   const merged: Record<string, string[]> = {};
   for (const field of arrayFields(mode.schema.map)) {
     const all = dedupe(results.flatMap((r) => r[field] || []));
-    merged[field] = field === "interestingStrings" ? all.slice(0, 100) : all;
+    merged[field] = field === "interestingStrings" ? all.slice(0, INTERESTING_STRINGS_CAP) : all;
   }
   return JSON.stringify(merged, null, 2);
 }
@@ -161,7 +161,8 @@ async function reduceResults(
     const raw = response.choices[0]?.message?.content || "{}";
     const parsed = JSON.parse(raw);
     return { ...parsed, rawResponse: raw };
-  } catch {
+  } catch (err) {
+    logVerbose(`  Reduce phase failed: ${err instanceof Error ? err.message : String(err)}`);
     return emptyResult("Failed to parse reduce-phase LLM response");
   }
 }

@@ -22,6 +22,9 @@ export const MAX_TOTAL_CHARS = 120_000;
 export const MAP_CONCURRENCY = 5;
 // If distilled data is under this size, skip MAP phase and use distilled-only mode
 export const DISTILLED_ONLY_THRESHOLD = 60_000;
+// Cap on the unbounded `interestingStrings` field after merging chunk results,
+// to keep the reduce-phase prompt from exploding. Other merged fields are not capped.
+export const INTERESTING_STRINGS_CAP = 100;
 
 // --- API key -------------------------------------------------------------
 export function getApiKey(required = true): string {
