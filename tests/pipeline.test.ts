@@ -38,7 +38,6 @@ vi.mock("openai", () => {
                 message: {
                   content: JSON.stringify({
                     stack: ["React"],
-                    versions: { React: "18.2.0" },
                     description: "A test app",
                   }),
                 },

@@ -36,7 +36,7 @@ async function fetchUrl(url: string, timeoutMs: number): Promise<FetchResult> {
     signal: AbortSignal.timeout(timeoutMs),
     headers: {
       "User-Agent":
-        "Mozilla/5.0 (compatible; DomainAnalyzer/0.1; +https://github.com/domain-analyzer)",
+        "Mozilla/5.0 (compatible; fafo/0.1; +https://github.com/oxedom/fafo)",
       Accept: "text/html,application/xhtml+xml,*/*",
       "Accept-Encoding": "gzip, deflate, br",
     },
