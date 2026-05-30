@@ -48,7 +48,6 @@ export interface DomainResult {
   htmlTitle: string | null;
   headerAnalysis: import("./headers.js").HeaderAnalysis | null;
   htmlMetadata: HtmlMetadata | null;
-  cssAnalysis: import("./css-analyzer.js").CssAnalysis | null;
   scriptsFound: number;
   bundlesAnalyzed: number;
   bundles: BundleContent[];
