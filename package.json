@@ -1,10 +1,10 @@
 {
-  "name": "domain-analyzer",
+  "name": "fafo",
   "version": "0.1.0",
-  "description": "CLI tool that analyzes domains by fetching their JS bundles and using AI to detect frontend stacks",
+  "description": "CLI that analyzes a website's JS bundles through a chosen research mode (security or product)",
   "type": "module",
   "bin": {
-    "domain-analyzer": "./dist/index.js"
+    "fafo": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc && cp src/modes.json dist/modes.json",

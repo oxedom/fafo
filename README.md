@@ -1,9 +1,9 @@
 # fafo — Frontend And Find Out
 
-CLI tool that detects any website's frontend stack by analyzing its JS bundles with AI.
+CLI tool that analyzes any website's JS bundles with AI through a chosen research mode.
 
 ```bash
-npx fafo --input domains.json
+npx fafo --input domains.json --mode security
 ```
 
 ## Setup
@@ -11,25 +11,31 @@ npx fafo --input domains.json
 ```bash
 npm install -g fafo
 echo '["github.com", "vercel.com"]' > input.json
-OPENAI_API_KEY=sk-... fafo --input input.json
+OPENAI_API_KEY=sk-... fafo --input input.json --mode security
 ```
 
 ## Usage
 
 ```
-fafo [options]
+fafo --input <domains.json> --mode <name>
 
-  -i, --input <path>        Input JSON file (array of domains)
-  -o, --output <path>       Output JSON file
-  -m, --model <model>       OpenAI model (default: gpt-4.1)
-  -c, --concurrency <n>     Parallel fetches (default: 5)
-  --preset <name>           Prompt preset: stack | endpoints | i18n
-  --prompt <text>           Custom prompt
-  --base-url <url>          OpenAI-compatible API base URL
-  --source-maps             Fetch source maps
-  --verbose                 Show progress
-  --json                    JSON-only stdout
+  -i, --input <path>     Input JSON file: array of domains (required)
+  -m, --mode <name>      Research mode: security | product (required)
+  -o, --output <path>    Output JSON file (default: ./output/results-<ts>.json)
+  --json                 Output only JSON to stdout
+  --verbose              Show progress on stderr
+  -h, --help             Show help
 ```
+
+## Modes
+
+A *mode* is a self-contained research profile — its own prompts and output schema.
+
+- **security** — greybox recon: tech stack, API endpoints, routes, auth mechanisms, security findings.
+- **product** — product reconstruction: features, user workflows, business entities, monetization, user roles.
+
+Modes are defined in `src/modes.json` (prompts + output schema). Shared tuning
+(model, concurrency, timeouts, source maps) lives in `src/config.ts`.
 
 ## Example output
 
@@ -47,12 +53,12 @@ fafo [options]
 
 ## How it works
 
-1. Fetches HTML, extracts JS bundles and stylesheets
+1. Fetches HTML, extracts JS bundles
 2. Runs regex distillation to pre-extract libraries, endpoints, routes
-3. If distilled data is small enough — sends directly to LLM (cheap)
+3. If distilled data is small enough — sends directly to the LLM (cheap)
 4. Otherwise: MAP (parallel per-chunk analysis) → REDUCE (synthesis)
 
-All prompts live in `src/prompts.json` — edit them without touching code.
+The selected mode supplies the prompts and the output schema for every phase.
 
 ## License
 
