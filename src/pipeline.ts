@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import pLimit from "p-limit";
-import type { CliOptions, DomainResult, RunOutput } from "./types.js";
-import { getApiKey } from "./config.js";
+import type { RunConfig, DomainResult, RunOutput } from "./types.js";
+import { getApiKey, resolveMode } from "./config.js";
 import { fetchDomainHtml } from "./fetcher.js";
 import { extractScripts, extractTitle, extractHtmlMetadata, formatHtmlMetadataForLLM } from "./parser.js";
 import { extractSourceMapUrl, fetchAndParseSourceMap, formatSourceMapForLLM } from "./sourcemap.js";
@@ -17,7 +17,7 @@ import { validateDomain } from "./utils/url.js";
 import { analyzeHeaders, formatHeadersForLLM } from "./headers.js";
 import type { HeaderAnalysis } from "./headers.js";
 
-export async function runPipeline(opts: CliOptions): Promise<RunOutput> {
+export async function runPipeline(opts: RunConfig): Promise<RunOutput> {
   const startedAt = new Date().toISOString();
 
   // Read and validate input
@@ -43,6 +43,7 @@ export async function runPipeline(opts: CliOptions): Promise<RunOutput> {
     log("No valid domains in input file.");
   }
 
+  const mode = resolveMode(opts.mode);
   const apiKey = getApiKey(!opts.baseUrl);
   const limit = pLimit(opts.concurrency);
 
@@ -62,7 +63,7 @@ export async function runPipeline(opts: CliOptions): Promise<RunOutput> {
     startedAt,
     completedAt: new Date().toISOString(),
     model: opts.model,
-    prompt: opts.prompt,
+    mode: opts.mode,
     totalDomains: validDomains.length,
     successful,
     failed,
@@ -80,11 +81,12 @@ async function processDomain(
   domain: string,
   index: number,
   total: number,
-  opts: CliOptions,
+  opts: RunConfig,
   apiKey: string
 ): Promise<DomainResult> {
   const start = Date.now();
   log(`[${index}/${total}] ${domain}`);
+  const mode = resolveMode(opts.mode);
 
   try {
     // 1. Fetch HTML
@@ -180,16 +182,16 @@ async function processDomain(
     const analysis = await analyzeChunked(
       chunks,
       opts.model,
-      opts.prompt,
+      mode,
       apiKey,
       distilledBundles,
       opts.baseUrl,
       extraContext
     );
 
-    log(
-      `  ✓ ${domain} — ${analysis.stack.join(", ") || "unknown stack"}`
-    );
+    const stackField = (analysis as Record<string, unknown>).stack;
+    const summary = Array.isArray(stackField) ? stackField.join(", ") : "";
+    log(`  ✓ ${domain}${summary ? ` — ${summary}` : ""}`);
 
     return {
       domain,

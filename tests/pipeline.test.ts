@@ -52,17 +52,32 @@ vi.mock("openai", () => {
   };
 });
 
-// Mock config
-vi.mock("../src/config.js", () => ({
-  getApiKey: () => "fake-key",
-  DEFAULT_MODEL: "gpt-4.1",
-  DEFAULT_PROMPT: "What stack?",
-  DEFAULT_CONCURRENCY: 2,
-  DEFAULT_MAX_BUNDLE_SIZE_KB: 100,
-  DEFAULT_MAX_BUNDLES: 3,
-  DEFAULT_TIMEOUT_MS: 5000,
-  MAX_TOTAL_CHARS: 120_000,
-}));
+vi.mock("../src/config.js", () => {
+  const fakeMode = {
+    description: "test",
+    prompts: { map: "m", reduce: "r", user: "u" },
+    schema: {
+      map: { type: "object", properties: {} },
+      reduce: { type: "object", properties: {} },
+    },
+  };
+  return {
+    getApiKey: () => "fake-key",
+    DEFAULT_MODEL: "gpt-4.1",
+    DEFAULT_CONCURRENCY: 2,
+    DEFAULT_MAX_BUNDLE_SIZE_KB: 100,
+    DEFAULT_MAX_BUNDLES: 3,
+    DEFAULT_TIMEOUT_MS: 5000,
+    DEFAULT_SOURCE_MAPS: false,
+    DEFAULT_VERBOSE: false,
+    MAX_TOTAL_CHARS: 120_000,
+    MAP_CONCURRENCY: 5,
+    DISTILLED_ONLY_THRESHOLD: 60_000,
+    listModes: () => ["security", "product"],
+    resolveMode: () => fakeMode,
+    validateMode: () => undefined,
+  };
+});
 
 describe("pipeline", () => {
   beforeEach(() => {
@@ -95,12 +110,13 @@ describe("pipeline", () => {
     const result = await runPipeline({
       input: tmpInput,
       output: tmpOutput,
+      mode: "security",
       concurrency: 2,
       model: "gpt-4.1",
       maxBundleSize: 100,
       maxBundles: 3,
       timeout: 5000,
-      prompt: "What stack?",
+      sourceMaps: false,
       json: true,
       verbose: false,
     });
