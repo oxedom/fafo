@@ -64,32 +64,6 @@ export function extractScripts(html: string, baseUrl: string): ScriptInfo[] {
   return rankScripts(scripts);
 }
 
-const EXCLUDED_STYLESHEET_PATTERNS = [
-  /fonts\.googleapis\.com/,
-  /use\.fontawesome\.com/,
-  /cdn\.jsdelivr\.net/,
-  /cdnjs\.cloudflare\.com/,
-  /unpkg\.com/,
-];
-
-export function extractStylesheets(html: string, baseUrl: string): string[] {
-  const $ = cheerio.load(html);
-  const urls: string[] = [];
-
-  $('link[rel="stylesheet"]').each((_, el) => {
-    const href = $(el).attr("href");
-    if (!href) return;
-
-    const resolved = resolveUrl(href, baseUrl);
-    if (resolved.startsWith("data:") || resolved.startsWith("blob:")) return;
-    if (EXCLUDED_STYLESHEET_PATTERNS.some((p) => p.test(resolved))) return;
-
-    urls.push(resolved);
-  });
-
-  return urls;
-}
-
 export function extractTitle(html: string): string | null {
   const $ = cheerio.load(html);
   const title = $("title").first().text().trim();

@@ -1,77 +1,11 @@
 import OpenAI from "openai";
 import pLimit from "p-limit";
-import { readFileSync } from "node:fs";
-import { fileURLToPath } from "node:url";
-import { join, dirname } from "node:path";
-import type { AnalysisResult } from "./types.js";
+import type { AnalysisResult, Mode } from "./types.js";
 import type { CodeChunk } from "./chunker.js";
 import type { DistilledBundle } from "./distiller.js";
 import { formatDistilledForLLM } from "./distiller.js";
 import { logVerbose } from "./utils/logger.js";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const prompts = JSON.parse(readFileSync(join(__dirname, "prompts.json"), "utf-8"));
-
-const MAP_SYSTEM_PROMPT: string = prompts.system.map;
-const REDUCE_SYSTEM_PROMPT: string = prompts.system.reduce;
-
-interface ChunkAnalysis {
-  stack: string[];
-  endpoints: string[];
-  routes: string[];
-  authMechanisms: string[];
-  securityFindings: string[];
-  appFunctionality: string[];
-  interestingStrings: string[];
-}
-
-const MAP_RESPONSE_FORMAT = {
-  type: "json_schema" as const,
-  json_schema: {
-    name: "chunk_analysis",
-    strict: true,
-    schema: {
-      type: "object" as const,
-      properties: {
-        stack: { type: "array" as const, items: { type: "string" as const } },
-        endpoints: { type: "array" as const, items: { type: "string" as const } },
-        routes: { type: "array" as const, items: { type: "string" as const } },
-        authMechanisms: { type: "array" as const, items: { type: "string" as const } },
-        securityFindings: { type: "array" as const, items: { type: "string" as const } },
-        appFunctionality: { type: "array" as const, items: { type: "string" as const } },
-        interestingStrings: { type: "array" as const, items: { type: "string" as const } },
-      },
-      required: ["stack", "endpoints", "routes", "authMechanisms", "securityFindings", "appFunctionality", "interestingStrings"],
-      additionalProperties: false,
-    },
-  },
-};
-
-const REDUCE_RESPONSE_FORMAT = {
-  type: "json_schema" as const,
-  json_schema: {
-    name: "analysis_result",
-    schema: {
-      type: "object" as const,
-      properties: {
-        stack: { type: "array" as const, items: { type: "string" as const } },
-        versions: { type: "object" as const, additionalProperties: { type: "string" as const } },
-        description: { type: "string" as const },
-        endpoints: { type: "array" as const, items: { type: "string" as const } },
-        routes: { type: "array" as const, items: { type: "string" as const } },
-        authMechanisms: { type: "array" as const, items: { type: "string" as const } },
-        securityFindings: { type: "array" as const, items: { type: "string" as const } },
-        appFunctionality: { type: "array" as const, items: { type: "string" as const } },
-      },
-      required: ["stack", "versions", "description", "endpoints", "routes", "authMechanisms", "securityFindings", "appFunctionality"],
-    },
-  },
-};
-
-const MAP_CONCURRENCY = 5;
-
-// If distilled data is under this size, skip MAP phase and use distilled-only mode
-const DISTILLED_ONLY_THRESHOLD = 60_000;
+import { DISTILLED_ONLY_THRESHOLD, MAP_CONCURRENCY, INTERESTING_STRINGS_CAP } from "./config.js";
 
 // Reasoning models (gpt-5.x, o1, o3, o4) reject custom temperature and consume
 // part of max_completion_tokens for internal reasoning before producing output.
@@ -79,40 +13,54 @@ function isReasoningModel(model: string): boolean {
   return /^(gpt-5|o[1-9])/i.test(model);
 }
 
+function mapResponseFormat(mode: Mode) {
+  return {
+    type: "json_schema" as const,
+    json_schema: { name: "chunk_analysis", strict: true, schema: mode.schema.map },
+  };
+}
+
+function reduceResponseFormat(mode: Mode) {
+  return {
+    type: "json_schema" as const,
+    json_schema: { name: "analysis_result", schema: mode.schema.reduce },
+  };
+}
+
+// The array-typed property names declared in a schema's `properties`.
+function arrayFields(schema: Record<string, unknown>): string[] {
+  const props = (schema?.properties ?? {}) as Record<string, { type?: string }>;
+  return Object.keys(props).filter((k) => props[k]?.type === "array");
+}
+
 export async function analyzeChunked(
   chunks: CodeChunk[],
   model: string,
-  prompt: string,
+  mode: Mode,
   apiKey: string,
   distilledBundles?: DistilledBundle[],
   baseUrl?: string,
   extraContext?: string
 ): Promise<AnalysisResult> {
-  const client = new OpenAI({
-    apiKey,
-    ...(baseUrl && { baseURL: baseUrl }),
-  });
+  const client = new OpenAI({ apiKey, ...(baseUrl && { baseURL: baseUrl }) });
 
-  // Check if distilled data is compact enough to skip MAP phase
+  // Skip MAP phase if distilled data is compact enough.
   if (distilledBundles && distilledBundles.length > 0) {
     const distilledText = distilledBundles.map(formatDistilledForLLM).join("\n\n");
     if (distilledText.length < DISTILLED_ONLY_THRESHOLD) {
-      logVerbose(`  Distilled data is ${distilledText.length} chars — using distilled-only mode (skipping MAP phase)`);
-      return reduceResults(client, null, model, prompt, distilledBundles, extraContext);
+      logVerbose(`  Distilled data is ${distilledText.length} chars — distilled-only mode (skipping MAP phase)`);
+      return reduceResults(client, null, model, mode, distilledBundles, extraContext);
     }
   }
 
-  // MAP phase: analyze each chunk independently (fallback for large bundles)
   logVerbose(`  Map phase: analyzing ${chunks.length} chunks with ${model}...`);
   const limit = pLimit(MAP_CONCURRENCY);
   const chunkResults = await Promise.all(
-    chunks.map((chunk) =>
-      limit(() => analyzeChunk(client, chunk, model))
-    )
+    chunks.map((chunk) => limit(() => analyzeChunk(client, chunk, model, mode)))
   );
 
   const validResults = chunkResults.filter(
-    (r): r is ChunkAnalysis => r !== null
+    (r): r is Record<string, string[]> => r !== null
   );
   logVerbose(`  Map phase complete: ${validResults.length}/${chunks.length} chunks produced results`);
 
@@ -120,21 +68,18 @@ export async function analyzeChunked(
     return emptyResult("No chunks produced analysis results");
   }
 
-  // REDUCE phase: merge all chunk findings + distilled data
   logVerbose(`  Reduce phase: merging findings...`);
-  const merged = mergeChunkResults(validResults);
-  const result = await reduceResults(client, merged, model, prompt, distilledBundles, extraContext);
-
-  return result;
+  const merged = mergeChunkResults(validResults, mode);
+  return reduceResults(client, merged, model, mode, distilledBundles, extraContext);
 }
 
 async function analyzeChunk(
   client: OpenAI,
   chunk: CodeChunk,
-  model: string
-): Promise<ChunkAnalysis | null> {
+  model: string,
+  mode: Mode
+): Promise<Record<string, string[]> | null> {
   const userMessage = `Bundle: ${chunk.bundleUrl} (chunk ${chunk.index + 1}/${chunk.totalChunks})\n\n${chunk.content}`;
-
   logVerbose(`    Analyzing chunk ${chunk.index + 1}/${chunk.totalChunks} of ${chunk.bundleUrl} (${chunk.charCount} chars)`);
 
   try {
@@ -142,43 +87,33 @@ async function analyzeChunk(
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: "system", content: MAP_SYSTEM_PROMPT },
+        { role: "system", content: mode.prompts.map },
         { role: "user", content: userMessage },
       ],
-      response_format: MAP_RESPONSE_FORMAT,
+      response_format: mapResponseFormat(mode),
       ...(reasoning ? {} : { temperature: 0.1 }),
       max_completion_tokens: reasoning ? 6000 : 1500,
     });
 
     const raw = response.choices[0]?.message?.content || "{}";
     const parsed = JSON.parse(raw);
-
-    return {
-      stack: parsed.stack || [],
-      endpoints: parsed.endpoints || [],
-      routes: parsed.routes || [],
-      authMechanisms: parsed.authMechanisms || [],
-      securityFindings: parsed.securityFindings || [],
-      appFunctionality: parsed.appFunctionality || [],
-      interestingStrings: parsed.interestingStrings || [],
-    };
+    const out: Record<string, string[]> = {};
+    for (const field of arrayFields(mode.schema.map)) {
+      out[field] = Array.isArray(parsed[field]) ? parsed[field] : [];
+    }
+    return out;
   } catch (err) {
     logVerbose(`    Chunk ${chunk.index + 1} failed: ${err instanceof Error ? err.message : String(err)}`);
     return null;
   }
 }
 
-function mergeChunkResults(results: ChunkAnalysis[]): string {
-  const merged = {
-    stack: dedupe(results.flatMap((r) => r.stack)),
-    endpoints: dedupe(results.flatMap((r) => r.endpoints)),
-    routes: dedupe(results.flatMap((r) => r.routes)),
-    authMechanisms: dedupe(results.flatMap((r) => r.authMechanisms)),
-    securityFindings: dedupe(results.flatMap((r) => r.securityFindings)),
-    appFunctionality: dedupe(results.flatMap((r) => r.appFunctionality)),
-    interestingStrings: dedupe(results.flatMap((r) => r.interestingStrings)).slice(0, 100),
-  };
-
+function mergeChunkResults(results: Record<string, string[]>[], mode: Mode): string {
+  const merged: Record<string, string[]> = {};
+  for (const field of arrayFields(mode.schema.map)) {
+    const all = dedupe(results.flatMap((r) => r[field] || []));
+    merged[field] = field === "interestingStrings" ? all.slice(0, INTERESTING_STRINGS_CAP) : all;
+  }
   return JSON.stringify(merged, null, 2);
 }
 
@@ -186,11 +121,11 @@ async function reduceResults(
   client: OpenAI,
   mergedFindings: string | null,
   model: string,
-  prompt: string,
+  mode: Mode,
   distilledBundles?: DistilledBundle[],
   extraContext?: string
 ): Promise<AnalysisResult> {
-  let userMessage = prompt;
+  let userMessage = mode.prompts.user;
 
   if (extraContext) {
     userMessage += `\n\n${extraContext}`;
@@ -215,29 +150,19 @@ async function reduceResults(
     const response = await client.chat.completions.create({
       model,
       messages: [
-        { role: "system", content: REDUCE_SYSTEM_PROMPT },
+        { role: "system", content: mode.prompts.reduce },
         { role: "user", content: userMessage },
       ],
-      response_format: REDUCE_RESPONSE_FORMAT,
+      response_format: reduceResponseFormat(mode),
       ...(reasoning ? {} : { temperature: 0.2 }),
       max_completion_tokens: reasoning ? 12000 : 3000,
     });
 
     const raw = response.choices[0]?.message?.content || "{}";
     const parsed = JSON.parse(raw);
-
-    return {
-      stack: parsed.stack || [],
-      versions: parsed.versions || {},
-      description: parsed.description || "Unable to determine",
-      endpoints: parsed.endpoints || [],
-      routes: parsed.routes || [],
-      authMechanisms: parsed.authMechanisms || [],
-      securityFindings: parsed.securityFindings || [],
-      appFunctionality: parsed.appFunctionality || [],
-      rawResponse: raw,
-    };
-  } catch {
+    return { ...parsed, rawResponse: raw };
+  } catch (err) {
+    logVerbose(`  Reduce phase failed: ${err instanceof Error ? err.message : String(err)}`);
     return emptyResult("Failed to parse reduce-phase LLM response");
   }
 }
@@ -253,15 +178,5 @@ function dedupe(arr: string[]): string[] {
 }
 
 function emptyResult(description: string): AnalysisResult {
-  return {
-    stack: [],
-    versions: {},
-    description,
-    endpoints: [],
-    routes: [],
-    authMechanisms: [],
-    securityFindings: [],
-    appFunctionality: [],
-    rawResponse: "",
-  };
+  return { description, rawResponse: "" };
 }

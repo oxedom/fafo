@@ -1,3 +1,9 @@
+export interface Mode {
+  description: string;
+  prompts: { map: string; reduce: string; user: string };
+  schema: { map: Record<string, unknown>; reduce: Record<string, unknown> };
+}
+
 export interface InlineScriptData {
   type: "next-data" | "initial-state" | "config" | "generic";
   content: string;
@@ -28,17 +34,7 @@ export interface BundleContent {
   content: string;
 }
 
-export interface AnalysisResult {
-  stack: string[];
-  versions: Record<string, string>;
-  description: string;
-  endpoints: string[];
-  routes: string[];
-  authMechanisms: string[];
-  securityFindings: string[];
-  appFunctionality: string[];
-  rawResponse: string;
-}
+export type AnalysisResult = Record<string, unknown> & { rawResponse: string };
 
 export interface DomainResult {
   domain: string;
@@ -48,7 +44,6 @@ export interface DomainResult {
   htmlTitle: string | null;
   headerAnalysis: import("./headers.js").HeaderAnalysis | null;
   htmlMetadata: HtmlMetadata | null;
-  cssAnalysis: import("./css-analyzer.js").CssAnalysis | null;
   scriptsFound: number;
   bundlesAnalyzed: number;
   bundles: BundleContent[];
@@ -62,24 +57,24 @@ export interface RunOutput {
   startedAt: string;
   completedAt: string;
   model: string;
-  prompt: string;
+  mode: string;
   totalDomains: number;
   successful: number;
   failed: number;
   results: DomainResult[];
 }
 
-export interface CliOptions {
+export interface RunConfig {
   input: string;
   output: string;
-  concurrency: number;
+  mode: string;
   model: string;
-  baseUrl?: string;
+  concurrency: number;
   maxBundleSize: number;
   maxBundles: number;
   timeout: number;
-  prompt: string;
   sourceMaps: boolean;
+  baseUrl?: string;
   json: boolean;
   verbose: boolean;
 }

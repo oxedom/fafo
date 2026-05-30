@@ -1,14 +1,16 @@
 import { Command } from "commander";
 import { resolve } from "node:path";
-import type { CliOptions } from "./types.js";
+import type { RunConfig } from "./types.js";
 import {
   DEFAULT_MODEL,
-  DEFAULT_PROMPT,
   DEFAULT_CONCURRENCY,
   DEFAULT_MAX_BUNDLE_SIZE_KB,
   DEFAULT_MAX_BUNDLES,
   DEFAULT_TIMEOUT_MS,
-  PROMPT_PRESETS,
+  DEFAULT_SOURCE_MAPS,
+  DEFAULT_VERBOSE,
+  listModes,
+  resolveMode,
 } from "./config.js";
 import { setLogOptions } from "./utils/logger.js";
 import { runPipeline } from "./pipeline.js";
@@ -17,75 +19,45 @@ export function createProgram(): Command {
   const program = new Command();
 
   program
-    .name("domain-analyzer")
+    .name("fafo")
     .description(
-      "Analyze domains by fetching their JS bundles and detecting frontend stacks with AI"
+      "Frontend And Find Out — analyze a website's JS bundles through a chosen research mode"
     )
     .version("0.1.0")
-    .option(
-      "-i, --input <path>",
-      "Path to input JSON file",
-      "./input.json"
+    .requiredOption("-i, --input <path>", "Path to input JSON file (array of domains)")
+    .requiredOption(
+      "-m, --mode <name>",
+      `Research mode: ${listModes().join(", ")}`
     )
     .option(
       "-o, --output <path>",
       "Path to output JSON file",
       `./output/results-${Date.now()}.json`
     )
-    .option(
-      "-c, --concurrency <n>",
-      "Max parallel domain fetches",
-      String(DEFAULT_CONCURRENCY)
-    )
-    .option("-m, --model <model>", "OpenAI model to use", DEFAULT_MODEL)
-    .option("--base-url <url>", "OpenAI-compatible API base URL (for Ollama, Anthropic proxy, etc.)")
-    .option(
-      "--max-bundle-size <kb>",
-      "Max KB of JS to send per bundle",
-      String(DEFAULT_MAX_BUNDLE_SIZE_KB)
-    )
-    .option(
-      "--max-bundles <n>",
-      "Max bundles to analyze per domain",
-      String(DEFAULT_MAX_BUNDLES)
-    )
-    .option(
-      "--timeout <ms>",
-      "HTTP fetch timeout in ms",
-      String(DEFAULT_TIMEOUT_MS)
-    )
-    .option("--prompt <text>", "Custom analysis prompt", DEFAULT_PROMPT)
-    .option(
-      "--preset <name>",
-      `Use a prompt preset: ${Object.keys(PROMPT_PRESETS).join(", ")}`
-    )
-    .option("--source-maps", "Attempt to fetch and parse source maps (makes additional HTTP requests)", false)
     .option("--json", "Output only JSON to stdout (no progress)", false)
-    .option("--verbose", "Show detailed progress on stderr", false)
+    .option("--verbose", "Show detailed progress on stderr", DEFAULT_VERBOSE)
     .action(async (rawOpts) => {
-      let prompt = rawOpts.prompt;
-      if (rawOpts.preset) {
-        const presetPrompt = PROMPT_PRESETS[rawOpts.preset];
-        if (!presetPrompt) {
-          process.stderr.write(
-            `Unknown preset "${rawOpts.preset}". Available: ${Object.keys(PROMPT_PRESETS).join(", ")}\n`
-          );
-          process.exit(2);
-        }
-        prompt = presetPrompt;
+      // Validate the mode up front for a clean error message.
+      try {
+        resolveMode(rawOpts.mode);
+      } catch (err) {
+        process.stderr.write(
+          (err instanceof Error ? err.message : String(err)) + "\n"
+        );
+        process.exit(2);
       }
 
-      const opts: CliOptions = {
+      const opts: RunConfig = {
         input: resolve(rawOpts.input),
         output: resolve(rawOpts.output),
-        concurrency: parseInt(rawOpts.concurrency, 10),
-        model: rawOpts.model,
-        baseUrl: rawOpts.baseUrl || process.env.OPENAI_BASE_URL,
-        maxBundleSize: parseInt(rawOpts.maxBundleSize, 10),
-        maxBundles: parseInt(rawOpts.maxBundles, 10),
-        timeout: parseInt(rawOpts.timeout, 10),
-        prompt,
-        sourceMaps: rawOpts.sourceMaps,
+        mode: rawOpts.mode,
+        model: DEFAULT_MODEL,
+        concurrency: DEFAULT_CONCURRENCY,
+        maxBundleSize: DEFAULT_MAX_BUNDLE_SIZE_KB,
+        maxBundles: DEFAULT_MAX_BUNDLES,
+        timeout: DEFAULT_TIMEOUT_MS,
+        sourceMaps: DEFAULT_SOURCE_MAPS,
+        baseUrl: process.env.OPENAI_BASE_URL,
         json: rawOpts.json,
         verbose: rawOpts.verbose,
       };
@@ -99,13 +71,10 @@ export function createProgram(): Command {
           process.stdout.write(JSON.stringify(result, null, 2) + "\n");
         }
 
-        const anySuccess = result.results.some(
-          (r) => r.status === "success"
-        );
+        const anySuccess = result.results.some((r) => r.status === "success");
         process.exit(anySuccess ? 0 : 1);
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : String(err);
+        const message = err instanceof Error ? err.message : String(err);
         process.stderr.write(`Fatal: ${message}\n`);
         process.exit(2);
       }

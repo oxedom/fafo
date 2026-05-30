@@ -1,12 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import pLimit from "p-limit";
-import type { CliOptions, DomainResult, RunOutput } from "./types.js";
-import { getApiKey } from "./config.js";
+import type { RunConfig, DomainResult, RunOutput, Mode } from "./types.js";
+import { getApiKey, resolveMode } from "./config.js";
 import { fetchDomainHtml } from "./fetcher.js";
-import { extractScripts, extractTitle, extractHtmlMetadata, formatHtmlMetadataForLLM, extractStylesheets } from "./parser.js";
-import { analyzeCss, formatCssAnalysisForLLM } from "./css-analyzer.js";
-import type { CssAnalysis } from "./css-analyzer.js";
+import { extractScripts, extractTitle, extractHtmlMetadata, formatHtmlMetadataForLLM } from "./parser.js";
 import { extractSourceMapUrl, fetchAndParseSourceMap, formatSourceMapForLLM } from "./sourcemap.js";
 import type { SourceMapData } from "./sourcemap.js";
 import { fetchBundles } from "./bundler.js";
@@ -19,7 +17,7 @@ import { validateDomain } from "./utils/url.js";
 import { analyzeHeaders, formatHeadersForLLM } from "./headers.js";
 import type { HeaderAnalysis } from "./headers.js";
 
-export async function runPipeline(opts: CliOptions): Promise<RunOutput> {
+export async function runPipeline(opts: RunConfig): Promise<RunOutput> {
   const startedAt = new Date().toISOString();
 
   // Read and validate input
@@ -45,6 +43,7 @@ export async function runPipeline(opts: CliOptions): Promise<RunOutput> {
     log("No valid domains in input file.");
   }
 
+  const mode = resolveMode(opts.mode);
   const apiKey = getApiKey(!opts.baseUrl);
   const limit = pLimit(opts.concurrency);
 
@@ -52,7 +51,7 @@ export async function runPipeline(opts: CliOptions): Promise<RunOutput> {
 
   const results: DomainResult[] = await Promise.all(
     validDomains.map((domain: string, i: number) =>
-      limit(() => processDomain(domain, i + 1, validDomains.length, opts, apiKey))
+      limit(() => processDomain(domain, i + 1, validDomains.length, opts, apiKey, mode))
     )
   );
 
@@ -64,7 +63,7 @@ export async function runPipeline(opts: CliOptions): Promise<RunOutput> {
     startedAt,
     completedAt: new Date().toISOString(),
     model: opts.model,
-    prompt: opts.prompt,
+    mode: opts.mode,
     totalDomains: validDomains.length,
     successful,
     failed,
@@ -82,8 +81,9 @@ async function processDomain(
   domain: string,
   index: number,
   total: number,
-  opts: CliOptions,
-  apiKey: string
+  opts: RunConfig,
+  apiKey: string,
+  mode: Mode
 ): Promise<DomainResult> {
   const start = Date.now();
   log(`[${index}/${total}] ${domain}`);
@@ -96,10 +96,9 @@ async function processDomain(
     const headerAnalysis = analyzeHeaders(headers);
     const htmlMetadata = extractHtmlMetadata(html, url);
 
-    // 2. Extract scripts and stylesheets
+    // 2. Extract scripts
     const scripts = extractScripts(html, url);
-    const stylesheetUrls = extractStylesheets(html, url);
-    logVerbose(`  Found ${scripts.length} script(s), ${stylesheetUrls.length} stylesheet(s)`);
+    logVerbose(`  Found ${scripts.length} script(s)`);
 
     if (scripts.length === 0) {
       return {
@@ -110,7 +109,6 @@ async function processDomain(
         htmlTitle,
         headerAnalysis,
         htmlMetadata,
-        cssAnalysis: null,
         scriptsFound: 0,
         bundlesAnalyzed: 0,
         bundles: [],
@@ -138,7 +136,6 @@ async function processDomain(
         htmlTitle,
         headerAnalysis,
         htmlMetadata,
-        cssAnalysis: null,
         scriptsFound: scripts.length,
         bundlesAnalyzed: 0,
         bundles: [],
@@ -148,14 +145,7 @@ async function processDomain(
       };
     }
 
-    // 3b. Fetch and analyze CSS
-    let cssAnalysis: CssAnalysis | null = null;
-    if (stylesheetUrls.length > 0) {
-      logVerbose(`  Analyzing ${stylesheetUrls.length} stylesheet(s)...`);
-      cssAnalysis = await fetchAndAnalyzeCss(stylesheetUrls.slice(0, 3), opts.timeout);
-    }
-
-    // 3c. Fetch source maps (opt-in)
+    // 3b. Fetch source maps (opt-in)
     const sourceMaps: SourceMapData[] = [];
     if (opts.sourceMaps) {
       logVerbose(`  Checking for source maps...`);
@@ -185,7 +175,6 @@ async function processDomain(
     const contextParts = [
       formatHeadersForLLM(headerAnalysis),
       formatHtmlMetadataForLLM(htmlMetadata),
-      cssAnalysis ? formatCssAnalysisForLLM(cssAnalysis) : "",
       ...sourceMaps.map(formatSourceMapForLLM),
     ].filter(Boolean);
     const extraContext = contextParts.length > 0 ? contextParts.join("\n\n") : undefined;
@@ -193,16 +182,16 @@ async function processDomain(
     const analysis = await analyzeChunked(
       chunks,
       opts.model,
-      opts.prompt,
+      mode,
       apiKey,
       distilledBundles,
       opts.baseUrl,
       extraContext
     );
 
-    log(
-      `  ✓ ${domain} — ${analysis.stack.join(", ") || "unknown stack"}`
-    );
+    const stackField = analysis.stack;
+    const summary = Array.isArray(stackField) ? stackField.join(", ") : "";
+    log(`  ✓ ${domain}${summary ? ` — ${summary}` : ""}`);
 
     return {
       domain,
@@ -212,7 +201,6 @@ async function processDomain(
       htmlTitle,
       headerAnalysis,
       htmlMetadata,
-      cssAnalysis,
       scriptsFound: scripts.length,
       bundlesAnalyzed: bundles.length,
       bundles: bundles.map((b) => ({
@@ -236,7 +224,6 @@ async function processDomain(
       htmlTitle: null,
       headerAnalysis: null,
       htmlMetadata: null,
-      cssAnalysis: null,
       scriptsFound: 0,
       bundlesAnalyzed: 0,
       bundles: [],
@@ -245,54 +232,4 @@ async function processDomain(
       durationMs: Date.now() - start,
     };
   }
-}
-
-async function fetchAndAnalyzeCss(
-  urls: string[],
-  timeoutMs: number
-): Promise<CssAnalysis> {
-  const combined: CssAnalysis = {
-    designSystems: [],
-    cssInJsRuntimes: [],
-    themeVariables: [],
-    breakpoints: [],
-    fontStacks: [],
-  };
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url, {
-        signal: AbortSignal.timeout(timeoutMs),
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; DomainAnalyzer/0.1; +https://github.com/domain-analyzer)",
-          "Accept-Encoding": "gzip, deflate, br",
-        },
-        redirect: "follow",
-      });
-
-      if (!response.ok) continue;
-
-      const text = await response.text();
-      // Limit CSS analysis to first 256KB
-      const content = text.slice(0, 256 * 1024);
-      const result = analyzeCss(content);
-
-      combined.designSystems.push(...result.designSystems);
-      combined.cssInJsRuntimes.push(...result.cssInJsRuntimes);
-      combined.themeVariables.push(...result.themeVariables);
-      combined.breakpoints.push(...result.breakpoints);
-      combined.fontStacks.push(...result.fontStacks);
-    } catch {
-      logVerbose(`    Failed to fetch CSS: ${url}`);
-    }
-  }
-
-  // Deduplicate
-  combined.designSystems = [...new Set(combined.designSystems)];
-  combined.cssInJsRuntimes = [...new Set(combined.cssInJsRuntimes)];
-  combined.themeVariables = [...new Set(combined.themeVariables)].slice(0, 50);
-  combined.breakpoints = [...new Set(combined.breakpoints)].slice(0, 20);
-  combined.fontStacks = [...new Set(combined.fontStacks)].slice(0, 10);
-
-  return combined;
 }
