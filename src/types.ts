@@ -1,3 +1,9 @@
+export interface Mode {
+  description: string;
+  prompts: { map: string; reduce: string; user: string };
+  schema: { map: Record<string, unknown>; reduce: Record<string, unknown> };
+}
+
 export interface InlineScriptData {
   type: "next-data" | "initial-state" | "config" | "generic";
   content: string;

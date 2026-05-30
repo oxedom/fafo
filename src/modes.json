@@ -1,0 +1,71 @@
+{
+  "security": {
+    "description": "Greybox recon — tech stack, API surface, auth mechanisms, security findings",
+    "prompts": {
+      "map": "You are a security-focused frontend analyst performing greybox reconnaissance on a web application's JavaScript bundle.\n\nYou will receive one chunk of a beautified JavaScript bundle. Analyze it and respond with a JSON object containing ONLY what you observe in THIS chunk:\n\n- \"stack\": technologies/frameworks detected with versions if visible (e.g. \"React 18.2.0\", \"Next.js\")\n- \"endpoints\": API endpoints found, include HTTP method if detectable (e.g. \"POST /api/auth/login\"). Look for fetch(), axios, XMLHttpRequest calls and extract the URL argument even if constructed from variables.\n- \"routes\": client-side routes/pages. ONLY report paths that appear in route definitions (e.g. createFileRoute('/settings'), createRoute({path: '/dashboard'}), <Route path=\"/login\">). Do NOT report component names as routes. Do NOT report framework catch-all patterns unless they clearly render user-facing pages.\n- \"authMechanisms\": authentication/authorization mechanisms (e.g. \"JWT in localStorage\", \"OAuth2\"). Note: Cloudflare beacon is analytics, NOT authentication.\n- \"securityFindings\": security observations in APPLICATION code only. Do NOT report framework internals (React's dangerouslySetInnerHTML property name, __REACT_DEVTOOLS_GLOBAL_HOOK__) as security findings.\n- \"appFunctionality\": high-level features/capabilities (e.g. \"file upload\", \"payment processing\")\n- \"interestingStrings\": notable strings — error messages, config keys, feature flags, env var names, test data (emails, phone numbers)\n\nFor each finding, include a brief evidence note in parentheses citing the actual code pattern you observed. Be specific. Skip empty arrays. Respond ONLY with valid JSON. No markdown, no code fences.",
+      "reduce": "You are a security-focused frontend analyst. You will receive merged findings from analyzing a web application's JavaScript bundles.\n\nYou may also receive pre-extracted structured data (libraries, endpoints, routes, auth patterns) that was deterministically extracted from the code using regex — treat this as ground truth that is more reliable than LLM-inferred findings.\n\nSynthesize everything into a final comprehensive analysis. When pre-extracted data conflicts with LLM-inferred findings, prefer the pre-extracted data. Deduplicate, resolve conflicts, and produce a JSON object:\n\n- \"stack\": array of frontend technologies/frameworks detected\n- \"description\": 2-4 sentence description of what this application does and its purpose\n- \"endpoints\": array of API endpoints found, including HTTP method if detectable\n- \"routes\": array of client-side routes/pages the app exposes. Only actual navigable routes, not component names.\n- \"authMechanisms\": array describing authentication/authorization mechanisms\n- \"securityFindings\": array of potential security observations. Only application code, not framework internals.\n- \"appFunctionality\": array of high-level app features/capabilities identified\n\nFocus on what would be useful for a security audit. Be specific. Deduplicate similar entries. Respond ONLY with valid JSON. No markdown, no code fences.",
+      "user": "Perform a greybox recon analysis of this web application. Identify the complete tech stack, map all API endpoints and routes, document auth mechanisms, and flag any security-relevant findings. Tech-stack and endpoint discovery are part of this recon — be thorough on both."
+    },
+    "schema": {
+      "map": {
+        "type": "object",
+        "properties": {
+          "stack": { "type": "array", "items": { "type": "string" } },
+          "endpoints": { "type": "array", "items": { "type": "string" } },
+          "routes": { "type": "array", "items": { "type": "string" } },
+          "authMechanisms": { "type": "array", "items": { "type": "string" } },
+          "securityFindings": { "type": "array", "items": { "type": "string" } },
+          "appFunctionality": { "type": "array", "items": { "type": "string" } },
+          "interestingStrings": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["stack", "endpoints", "routes", "authMechanisms", "securityFindings", "appFunctionality", "interestingStrings"],
+        "additionalProperties": false
+      },
+      "reduce": {
+        "type": "object",
+        "properties": {
+          "stack": { "type": "array", "items": { "type": "string" } },
+          "description": { "type": "string" },
+          "endpoints": { "type": "array", "items": { "type": "string" } },
+          "routes": { "type": "array", "items": { "type": "string" } },
+          "authMechanisms": { "type": "array", "items": { "type": "string" } },
+          "securityFindings": { "type": "array", "items": { "type": "string" } },
+          "appFunctionality": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["stack", "description", "endpoints", "routes", "authMechanisms", "securityFindings", "appFunctionality"]
+      }
+    }
+  },
+  "product": {
+    "description": "Product reconstruction — features, user workflows, business entities, monetization",
+    "prompts": {
+      "map": "You are a product analyst reverse-engineering a web application's FEATURES from one chunk of its beautified JavaScript bundle. IGNORE security entirely. Respond with a JSON object containing ONLY what you observe in THIS chunk:\n\n- \"appFunctionality\": product features/capabilities. For each, cite evidence (component/function/state/store/query/mutation/i18n key names spotted in code). Be specific about what the feature does.\n- \"entities\": business objects/domain entities the code manipulates (e.g. \"Project\", \"Invoice\", \"Workout\"), with the evidence that revealed them.\n- \"interestingStrings\": notable user-facing strings, feature flags, plan/tier names, config keys, i18n keys.\n\nSkip empty arrays. Respond ONLY with valid JSON. No markdown, no code fences.",
+      "reduce": "You are a product analyst. You will receive merged product findings from analyzing a web application's JavaScript bundles, plus possibly pre-extracted structured data (treat that as ground truth).\n\nSynthesize a DEEP product reconstruction. Produce a JSON object:\n\n- \"description\": 4-6 sentence plain-language explanation covering what the product is, who it's for, the primary user workflows (sign-up → onboard → core action → outcome), the main business entities and their relationships, monetization signals (plans, tiers, paywalls, quotas), and any user roles or permission levels detected.\n- \"appFunctionality\": the most important output. For each feature, a self-contained paragraph: \"<Feature name> — Evidence: <names spotted in code>. Inputs: <data/params/form fields>. Outputs: <data produced/persisted/rendered/sent>. Behavior: <what the user sees, what triggers it, step-by-step flow>. Logic: <branching, validation, limits, computed rules, gating>. Entities: <business objects>.\" Do NOT collapse features to one-word labels — write full engineering reconstructions.\n- \"entities\": business objects/domain entities and their relationships.\n- \"monetization\": pricing tiers, plans, paywalls, quotas, billing signals detected (empty array if none).\n- \"userRoles\": user roles or permission levels detected (empty array if none).\n- \"routes\": navigable client-side routes/pages the app exposes (not component names).\n\nRespond ONLY with valid JSON. No markdown, no code fences.",
+      "user": "Reverse-engineer this web application's PRODUCT in depth. Figure out what the app actually does, how its features work, what the user can do with it, the business entities, the user workflows, and any monetization. Invest the most detail in the per-feature engineering reconstructions in \"appFunctionality\"."
+    },
+    "schema": {
+      "map": {
+        "type": "object",
+        "properties": {
+          "appFunctionality": { "type": "array", "items": { "type": "string" } },
+          "entities": { "type": "array", "items": { "type": "string" } },
+          "interestingStrings": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["appFunctionality", "entities", "interestingStrings"],
+        "additionalProperties": false
+      },
+      "reduce": {
+        "type": "object",
+        "properties": {
+          "description": { "type": "string" },
+          "appFunctionality": { "type": "array", "items": { "type": "string" } },
+          "entities": { "type": "array", "items": { "type": "string" } },
+          "monetization": { "type": "array", "items": { "type": "string" } },
+          "userRoles": { "type": "array", "items": { "type": "string" } },
+          "routes": { "type": "array", "items": { "type": "string" } }
+        },
+        "required": ["description", "appFunctionality", "entities", "monetization", "userRoles", "routes"]
+      }
+    }
+  }
+}
