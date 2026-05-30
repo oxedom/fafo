@@ -1,10 +1,19 @@
 {
-  "name": "fafo",
+  "name": "@oxedom/fafo",
   "version": "0.1.0",
   "description": "CLI that analyzes a website's JS bundles through a chosen research mode (security or product)",
   "type": "module",
   "bin": {
     "fafo": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "build": "tsc && cp src/modes.json dist/modes.json",
@@ -12,7 +21,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "keywords": [
     "domain",
@@ -22,6 +32,15 @@
     "cli"
   ],
   "license": "MIT",
+  "author": "oxedom",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/oxedom/fafo.git"
+  },
+  "homepage": "https://github.com/oxedom/fafo#readme",
+  "bugs": {
+    "url": "https://github.com/oxedom/fafo/issues"
+  },
   "dependencies": {
     "cheerio": "^1.2.0",
     "commander": "^14.0.3",

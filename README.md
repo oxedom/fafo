@@ -3,13 +3,13 @@
 CLI tool that analyzes any website's JS bundles with AI through a chosen research mode.
 
 ```bash
-npx fafo --input domains.json --mode security
+npx @oxedom/fafo --input domains.json --mode security
 ```
 
 ## Setup
 
 ```bash
-npm install -g fafo
+npm install -g @oxedom/fafo   # installs the `fafo` command
 echo '["github.com", "vercel.com"]' > input.json
 OPENAI_API_KEY=sk-... fafo --input input.json --mode security
 ```
