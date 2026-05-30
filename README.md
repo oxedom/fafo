@@ -29,13 +29,27 @@ fafo --input <domains.json> --mode <name>
 
 ## Modes
 
-A *mode* is a self-contained research profile — its own prompts and output schema.
+A *mode* is a self-contained research profile — its own prompts **and** output
+schema. The same bundle analyzed under two modes yields two differently-shaped
+results, because each mode reasons through its own lens end-to-end (per-chunk map,
+synthesis reduce, and the final JSON shape).
 
-- **security** — greybox recon: tech stack, API endpoints, routes, auth mechanisms, security findings.
-- **product** — product reconstruction: features, user workflows, business entities, monetization, user roles.
+Pick the mode for the question you're asking:
 
-Modes are defined in `src/modes.json` (prompts + output schema). Shared tuning
-(model, concurrency, timeouts, source maps) lives in `src/config.ts`.
+| Mode | Use it to answer | Output fields |
+|------|------------------|---------------|
+| **security** | "What's the attack surface and how is it built?" | `stack`, `description`, `endpoints`, `routes`, `authMechanisms`, `securityFindings`, `appFunctionality` |
+| **product** | "What is this product and how does it work?" | `description`, `appFunctionality` (deep per-feature reconstructions), `entities`, `monetization`, `userRoles`, `routes` |
+
+```bash
+fafo --input domains.json --mode security   # greybox recon: stack, API surface, auth, findings
+fafo --input domains.json --mode product    # features, workflows, business entities, monetization
+```
+
+Modes are defined in `src/modes.json` (prompts + output schema). Adding a mode is
+pure config — no code changes — because the analyzer derives its output fields from
+the mode's schema. Shared tuning (model, concurrency, timeouts, source maps) lives
+in `src/config.ts`.
 
 ## Example output
 
