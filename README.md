@@ -1,6 +1,13 @@
 # fafo — Frontend And Find Out
 
+[![npm version](https://img.shields.io/npm/v/@oxedom/fafo.svg)](https://www.npmjs.com/package/@oxedom/fafo)
+[![npm downloads](https://img.shields.io/npm/dm/@oxedom/fafo.svg)](https://www.npmjs.com/package/@oxedom/fafo)
+[![license](https://img.shields.io/npm/l/@oxedom/fafo.svg)](./LICENSE)
+[![node](https://img.shields.io/node/v/@oxedom/fafo.svg)](https://www.npmjs.com/package/@oxedom/fafo)
+
 CLI tool that analyzes any website's JS bundles with AI through a chosen research mode.
+
+**📦 npm:** [`@oxedom/fafo`](https://www.npmjs.com/package/@oxedom/fafo)
 
 ```bash
 npx @oxedom/fafo --input domains.json --mode security
