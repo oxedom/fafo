@@ -74,10 +74,3 @@ export function resolveMode(name: string): Mode {
   validateMode(name, raw);
   return raw;
 }
-
-// --- Legacy exports (still used by old analyzer/cli until Task 3) ---------
-const legacyPrompts = JSON.parse(
-  readFileSync(join(__dirname, "prompts.json"), "utf-8")
-);
-export const DEFAULT_PROMPT: string = legacyPrompts.default;
-export const PROMPT_PRESETS: Record<string, string> = legacyPrompts.presets;
