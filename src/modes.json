@@ -32,7 +32,8 @@
           "securityFindings": { "type": "array", "items": { "type": "string" } },
           "appFunctionality": { "type": "array", "items": { "type": "string" } }
         },
-        "required": ["stack", "description", "endpoints", "routes", "authMechanisms", "securityFindings", "appFunctionality"]
+        "required": ["stack", "description", "endpoints", "routes", "authMechanisms", "securityFindings", "appFunctionality"],
+        "additionalProperties": false
       }
     }
   },
@@ -64,7 +65,8 @@
           "userRoles": { "type": "array", "items": { "type": "string" } },
           "routes": { "type": "array", "items": { "type": "string" } }
         },
-        "required": ["description", "appFunctionality", "entities", "monetization", "userRoles", "routes"]
+        "required": ["description", "appFunctionality", "entities", "monetization", "userRoles", "routes"],
+        "additionalProperties": false
       }
     }
   }

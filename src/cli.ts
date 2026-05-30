@@ -8,6 +8,7 @@ import {
   DEFAULT_MAX_BUNDLES,
   DEFAULT_TIMEOUT_MS,
   DEFAULT_SOURCE_MAPS,
+  DEFAULT_VERBOSE,
   listModes,
   resolveMode,
 } from "./config.js";
@@ -34,7 +35,7 @@ export function createProgram(): Command {
       `./output/results-${Date.now()}.json`
     )
     .option("--json", "Output only JSON to stdout (no progress)", false)
-    .option("--verbose", "Show detailed progress on stderr", false)
+    .option("--verbose", "Show detailed progress on stderr", DEFAULT_VERBOSE)
     .action(async (rawOpts) => {
       // Validate the mode up front for a clean error message.
       try {

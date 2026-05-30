@@ -69,7 +69,6 @@ vi.mock("../src/config.js", () => {
     DEFAULT_TIMEOUT_MS: 5000,
     DEFAULT_SOURCE_MAPS: false,
     DEFAULT_VERBOSE: false,
-    MAX_TOTAL_CHARS: 120_000,
     MAP_CONCURRENCY: 5,
     DISTILLED_ONLY_THRESHOLD: 60_000,
     listModes: () => ["security", "product"],

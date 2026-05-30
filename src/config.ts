@@ -18,7 +18,6 @@ export const DEFAULT_SOURCE_MAPS = false;
 export const DEFAULT_VERBOSE = false;
 
 // Internal analysis knobs
-export const MAX_TOTAL_CHARS = 120_000;
 export const MAP_CONCURRENCY = 5;
 // If distilled data is under this size, skip MAP phase and use distilled-only mode
 export const DISTILLED_ONLY_THRESHOLD = 60_000;
