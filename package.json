@@ -1,7 +1,8 @@
 {
   "name": "@oxedom/fafo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "CLI that analyzes a website's JS bundles through a chosen research mode (security or product)",
+  "packageManager": "pnpm@10.24.0",
   "type": "module",
   "bin": {
     "fafo": "./dist/index.js"
@@ -22,7 +23,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "prepublishOnly": "pnpm run build"
   },
   "keywords": [
     "domain",
