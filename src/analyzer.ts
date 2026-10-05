@@ -151,7 +151,7 @@ async function reduceResults(
     return { ...parsed, rawResponse: JSON.stringify(parsed) };
   } catch (err) {
     logVerbose(`  Reduce phase failed: ${err instanceof Error ? err.message : String(err)}`);
-    return emptyResult("Failed to parse reduce-phase LLM response");
+    throw err;
   }
 }
 

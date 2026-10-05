@@ -51,6 +51,19 @@ describe("CLI provider contract", () => {
       userMessage: "data",
     });
     expect(defaultModelInvocation.args).not.toContain("--model");
+
+    const agyInvocation = buildCliInvocation({
+      provider: "agy",
+      model: "",
+      phase: "reduce",
+      mode,
+      systemPrompt: mode.prompts.reduce,
+      userMessage: "untrusted bundle data",
+    });
+    expect(agyInvocation.args).toEqual(expect.arrayContaining(["--input-format", "stream-json", "--output-format"]));
+    expect(agyInvocation.args.join(" ")).not.toContain("untrusted bundle data");
+    expect(JSON.parse(agyInvocation.stdin)).toMatchObject({ event: "user", message: { content: expect.any(String) } });
+    expect(agyInvocation.stdin).toContain("untrusted bundle data");
   });
 
   it("accepts a structured CLI envelope and rejects JSON that violates the phase schema", async () => {
@@ -66,6 +79,26 @@ describe("CLI provider contract", () => {
     expect(() => parseCliResponse('{"findings":[],"extra":true}', mode.schema.map)).toThrow(
       "does not conform"
     );
+  });
+
+  it("extracts Claude structured output from its JSON event array", async () => {
+    const { parseCliResponse } = await import("../src/cli-provider.js");
+    const events = [
+      { type: "system", subtype: "init" },
+      { type: "result", result: "{\"description\":\"ignored wrapper text\"}", structured_output: { description: "Claude result" } },
+    ];
+
+    expect(parseCliResponse(JSON.stringify(events), mode.schema.reduce)).toEqual({ description: "Claude result" });
+  });
+
+  it("extracts structured output from newline-delimited agent events", async () => {
+    const { parseCliResponse } = await import("../src/cli-provider.js");
+    const stream = [
+      JSON.stringify({ type: "system", event: "init" }),
+      JSON.stringify({ type: "result", structured_output: { description: "agy result" } }),
+    ].join("\n");
+
+    expect(parseCliResponse(stream, mode.schema.reduce)).toEqual({ description: "agy result" });
   });
 
   it("runs a local CLI with a scrubbed environment and validates its structured output", async () => {
