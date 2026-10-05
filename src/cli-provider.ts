@@ -260,6 +260,10 @@ function safeChildEnvironment(): NodeJS.ProcessEnv {
   const allowed = [
     "HOME", "PATH", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "COLORTERM", "TMPDIR",
     "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME", "CODEX_HOME", "CLAUDE_CONFIG_DIR",
+    // Claude Code's existing terminal login is represented by this OAuth token.
+    // It is inherited only by the selected local Claude executable; it is never
+    // placed in argv, sent to another provider, or included in Fafo output.
+    "CLAUDE_CODE_OAUTH_TOKEN",
   ];
   return Object.fromEntries(
     allowed.flatMap((key) => (process.env[key] === undefined ? [] : [[key, process.env[key]]]))
