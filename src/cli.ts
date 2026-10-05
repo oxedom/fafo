@@ -42,6 +42,23 @@ export function createProgram(): Command {
     .option("--provider <name>", "Analysis provider: openai, codex, claude, or agy", DEFAULT_PROVIDER)
     .option("--agent-command <path>", "Path to the provider executable (CLI providers only)")
     .option("--agent-timeout <ms>", "CLI provider timeout in milliseconds", String(DEFAULT_AGENT_TIMEOUT_MS))
+    .addHelpText("after", `
+Examples:
+  fafo --input domains.json --mode product
+  fafo --input domains.json --mode security --provider codex
+  fafo --input domains.json --mode product --provider claude --agent-timeout 300000
+  fafo --input domains.json --mode security --provider agy --agent-command /path/to/agy
+
+Providers:
+  openai  Uses OPENAI_API_KEY or LLM_API_KEY (default)
+  codex   Uses an existing local Codex CLI login
+  claude  Uses an existing local Claude CLI login
+  agy     Uses an existing local Antigravity CLI login
+
+Input file:
+  A JSON array of hostnames or URLs, for example:
+  ["https://app.example.com", "example.org"]
+`)
     .action(async (rawOpts) => {
       // Validate the mode up front for a clean error message.
       try {
