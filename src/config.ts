@@ -16,6 +16,8 @@ export const DEFAULT_MAX_BUNDLES = 5;
 export const DEFAULT_TIMEOUT_MS = 15000;
 export const DEFAULT_SOURCE_MAPS = false;
 export const DEFAULT_VERBOSE = false;
+export const DEFAULT_PROVIDER = "openai";
+export const DEFAULT_AGENT_TIMEOUT_MS = 120_000;
 
 // Internal analysis knobs
 export const MAP_CONCURRENCY = 5;

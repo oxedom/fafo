@@ -36,6 +36,8 @@ export interface BundleContent {
 
 export type AnalysisResult = Record<string, unknown> & { rawResponse: string };
 
+export type AnalysisProvider = "openai" | "codex" | "claude" | "agy";
+
 export interface DomainResult {
   domain: string;
   status: "success" | "error";
@@ -75,6 +77,9 @@ export interface RunConfig {
   timeout: number;
   sourceMaps: boolean;
   baseUrl?: string;
+  provider?: AnalysisProvider;
+  agentCommand?: string;
+  agentTimeout?: number;
   json: boolean;
   verbose: boolean;
 }

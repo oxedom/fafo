@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import pLimit from "p-limit";
-import type { RunConfig, DomainResult, RunOutput, Mode } from "./types.js";
-import { getApiKey, resolveMode } from "./config.js";
+import type { AnalysisProvider, RunConfig, DomainResult, RunOutput, Mode } from "./types.js";
+import { DEFAULT_AGENT_TIMEOUT_MS, getApiKey, resolveMode } from "./config.js";
 import { fetchDomainHtml } from "./fetcher.js";
 import { extractScripts, extractTitle, extractHtmlMetadata, formatHtmlMetadataForLLM } from "./parser.js";
 import { extractSourceMapUrl, fetchAndParseSourceMap, formatSourceMapForLLM } from "./sourcemap.js";
@@ -44,14 +44,15 @@ export async function runPipeline(opts: RunConfig): Promise<RunOutput> {
   }
 
   const mode = resolveMode(opts.mode);
-  const apiKey = getApiKey(!opts.baseUrl);
+  const provider: AnalysisProvider = opts.provider || "openai";
+  const apiKey = provider === "openai" ? getApiKey(!opts.baseUrl) : "";
   const limit = pLimit(opts.concurrency);
 
   log(`Analyzing ${validDomains.length} domain(s) with concurrency ${opts.concurrency}...`);
 
   const results: DomainResult[] = await Promise.all(
     validDomains.map((domain: string, i: number) =>
-      limit(() => processDomain(domain, i + 1, validDomains.length, opts, apiKey, mode))
+      limit(() => processDomain(domain, i + 1, validDomains.length, opts, apiKey, mode, provider))
     )
   );
 
@@ -83,7 +84,8 @@ async function processDomain(
   total: number,
   opts: RunConfig,
   apiKey: string,
-  mode: Mode
+  mode: Mode,
+  provider: AnalysisProvider
 ): Promise<DomainResult> {
   const start = Date.now();
   log(`[${index}/${total}] ${domain}`);
@@ -186,7 +188,10 @@ async function processDomain(
       apiKey,
       distilledBundles,
       opts.baseUrl,
-      extraContext
+      extraContext,
+      provider,
+      opts.agentCommand,
+      opts.agentTimeout || DEFAULT_AGENT_TIMEOUT_MS
     );
 
     const stackField = analysis.stack;
