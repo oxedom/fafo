@@ -51,10 +51,10 @@ fafo fetches page HTML, finds JavaScript bundles, extracts useful signals, then 
 ## Development
 
 ```bash
-npm install
-npm run lint
-npm test
-npm run build
+pnpm install
+pnpm lint
+pnpm test
+pnpm build
 ```
 
 ## License

@@ -25,7 +25,7 @@ export function createProgram(): Command {
     .description(
       "Frontend And Find Out — analyze a website's JS bundles through a chosen research mode"
     )
-    .version("0.1.0")
+    .version("0.1.1")
     .requiredOption("-i, --input <path>", "Path to input JSON file (array of domains)")
     .requiredOption(
       "-m, --mode <name>",
