@@ -2,7 +2,7 @@
 
 ![fafo pixel-art eye logo](assets/fafo.jpg)
 
-**Frontend And Find Out.** `fafo` reads a site's JavaScript bundles and turns them into a structured research report. Use it only on sites you are authorized to analyze.
+**Frontend And Find Out.** `fafo` reads a site's JavaScript bundles and turns them into a structured research report. 
 
 [![npm version](https://img.shields.io/npm/v/@oxedom/fafo.svg)](https://www.npmjs.com/package/@oxedom/fafo)
 [![license](https://img.shields.io/npm/l/@oxedom/fafo.svg)](LICENSE)
